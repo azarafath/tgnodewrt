@@ -22,9 +22,17 @@ MACH=""
 [ -z "$MACH" ] && MACH=$(awk -F: '/machine/ {print $2}' /proc/cpuinfo)
 [ -z "$MACH" ] && MACH=$(awk -F: '/model name/ {print $2}' /proc/cpuinfo)
 
-temp="$(cat /sys/devices/virtual/thermal/thermal_zone0/temp)"
-temp=$(($temp/1000))
-degree="$(echo $'\xc2\xb0'C)"
+# cpu temp
+if grep -q "ipq40xx" "/etc/openwrt_release"; then
+	cpu_temp="$(sensors | grep -Eo '\+[0-9]+.+C' | sed ':a;N;$!ba;s/\n/ /g;s/+//g')"
+elif [ -f "/sys/class/hwmon/hwmon0/temp1_input" ]; then
+	cpu_temp="$(awk '{ printf("%.1f °C", $0 / 1000) }' /sys/class/hwmon/hwmon0/temp1_input)"
+elif [ -f "/sys/class/thermal/thermal_zone0/temp" ]; then
+	cpu_temp="$(awk '{ printf("%.1f °C", $0 / 1000) }' /sys/class/thermal/thermal_zone0/temp)"
+else
+	cpu_temp="50.0 °C"
+fi
+cpu_tempx=$(echo $cpu_temp | sed 's/°C//g')
 
 U=$(cut -d. -f1 /proc/uptime)
 D=$(expr $U / 60 / 60 / 24)
@@ -70,7 +78,7 @@ printf "Machine     : $MACH"
 printf "\nOS          : $os"
 printf "\nArchitecture: armv8"
 printf "\nCPU Core    : 4"
-printf "\nTemperature : $temp$degree"
+printf "\nTemperature : $cpu_tempx"
 printf "\nUptime      : $U"
 printf "\n%-""s \n" "Free Memory : $MEM"
 printf "LAN         : $LAN\n"
